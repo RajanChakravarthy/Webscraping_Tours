@@ -3,11 +3,14 @@ import selectorlib
 import os
 import smtplib,ssl
 import time
+import sqlite3
+
 
 URL = 'http://programmer100.pythonanywhere.com/tours/'
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
+connection = sqlite3.connect('data.db')
 
 def scrape(url):
     ''' Scrape the page source from the URL'''
@@ -35,14 +38,22 @@ def send_email(message):
         server.sendmail(username, receiver, message)
 
 
-def read():
-    with open('data.txt', mode='r') as file:
-        return file.read()
+def read(extracted):
+    row = extracted.split(',')
+    band, city, date = [item.strip() for item in row]
+    cursor = connection.cursor()
+    cursor.execute('SELECT * FROM events WHERE band=? AND city=? AND date=?',(band, city, date))
+    rows = cursor.fetchall()
+    print(rows)
+    return rows
 
 
 def store(extracted):
-    with open('data.txt', mode='a') as file:
-        file.write(extracted + '\n')
+    row = extracted.split(',')
+    new_row = [item.strip() for item in row]
+    cursor = connection.cursor()
+    cursor.execute('INSERT INTO events VALUES(?,?,?)', new_row)
+    connection.commit()
 
 
 def extract(source):
@@ -61,14 +72,17 @@ if __name__ == '__main__':
         # extracts the required information based on the key filter
         extracted = extract(scraped)
         print(extracted)
-        # checks if path the data.txt exists
+        ''' 
+        # checks if path data.txt exists
         if not os.path.exists('data.txt'):
             with open('data.txt', mode='w'):
                 pass
-        content = read()
+        '''
+
 
         if extracted.lower() != 'no upcoming tours':
-            if extracted not in content:
+            rows = read(extracted)
+            if not rows:
                 store(extracted)
                 email_message = '''Subject: NEW EVENT!!!\n
                 
